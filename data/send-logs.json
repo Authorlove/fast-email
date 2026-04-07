@@ -1,0 +1,15 @@
+[
+  {
+    "id": "mnoieddff8nqjjak8pq",
+    "timestamp": 1775559695667,
+    "scheduledTime": 1775559695667,
+    "actualSendTime": 1775559695667,
+    "serverResponseTime": 1238,
+    "status": "success",
+    "responseCode": "250",
+    "smtpServer": "smtp.qq.com",
+    "attachmentSize": 235676,
+    "to": "arthur.xqw@qq.com",
+    "subject": "test"
+  }
+]

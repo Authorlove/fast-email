@@ -1,0 +1,19 @@
+{
+  "smtpConfigs": [
+    {
+      "id": "1",
+      "name": "QQ邮箱",
+      "host": "smtp.qq.com",
+      "port": 587,
+      "username": "arthur.xqw@qq.com",
+      "password": "knzuqawsrldybbid",
+      "useSSL": false,
+      "isActive": true
+    }
+  ],
+  "defaultSettings": {
+    "advanceMs": 100,
+    "maxAttachmentSize": 10,
+    "autoSaveDraft": false
+  }
+}
