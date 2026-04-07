@@ -195,18 +195,7 @@ const formatTime = (timestamp: number): string => {
 // Main Component
 export default function Home() {
   // State
-  const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfig[]>([
-    {
-      id: '1',
-      name: 'QQ邮箱',
-      host: 'smtp.qq.com',
-      port: 587,
-      username: 'arthur.xqw@qq.com',
-      password: 'knzuqawsrldybbid',
-      useSSL: false, // Port 587 uses STARTTLS, not direct SSL
-      isActive: true
-    }
-  ]);
+  const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfig[]>([]);
   
   const [emailContent, setEmailContent] = useState<EmailContent>({
     to: '',
