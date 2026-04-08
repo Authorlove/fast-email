@@ -12,3 +12,8 @@ services:
         value: 10000
     autoDeploy: true
     branch: main
+    # 重要：在 Render 控制面板手动配置以下环境变量：
+    # - ENCRYPTION_SECRET: 加密密钥（必填）
+    # - API_KEY_HASH: API Key（推荐，用于认证）
+    # - ALLOWED_ORIGINS: 允许的前端域名（推荐）
+    # 详细说明请查看 SECURITY.md

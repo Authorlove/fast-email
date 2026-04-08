@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
     "server": "tsx api/server.ts",
+    "generate-keys": "node scripts/generate-keys.js",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build",
     "electron:preview": "npm run build && electron .",

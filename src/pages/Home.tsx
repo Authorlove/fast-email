@@ -24,6 +24,7 @@ import RichTextEditor from '../components/RichTextEditor';
 import SmtpResponseCode from '../components/SmtpResponseCode';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:3001/api';
+const API_KEY_STORAGE_KEY = 'fastemail_api_key';
 
 // Types
 interface SmtpConfig {
@@ -133,12 +134,23 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Helper to create API functions with dynamic base URL
+const getApiKey = (): string | null => {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+};
+
+const getAuthHeaders = (): HeadersInit => {
+  const apiKey = getApiKey();
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+  return headers;
+};
+
 const createApi = (baseUrl: string) => ({
-  // Logs
   async getLogs(): Promise<SendLog[]> {
     try {
-      const response = await fetch(`${baseUrl}/logs`);
+      const response = await fetch(`${baseUrl}/logs`, { headers: getAuthHeaders() });
       const data = await response.json();
       return data.success ? data.logs : [];
     } catch {
@@ -149,23 +161,28 @@ const createApi = (baseUrl: string) => ({
   async saveLog(log: SendLog): Promise<void> {
     await fetch(`${baseUrl}/logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(log)
     });
   },
   
   async deleteLog(id: string): Promise<void> {
-    await fetch(`${baseUrl}/logs/${id}`, { method: 'DELETE' });
+    await fetch(`${baseUrl}/logs/${id}`, { 
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
   },
   
   async clearLogs(): Promise<void> {
-    await fetch(`${baseUrl}/logs`, { method: 'DELETE' });
+    await fetch(`${baseUrl}/logs`, { 
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
   },
   
-  // Settings
   async getSettings(): Promise<Settings | null> {
     try {
-      const response = await fetch(`${baseUrl}/settings`);
+      const response = await fetch(`${baseUrl}/settings`, { headers: getAuthHeaders() });
       const data = await response.json();
       return data.success ? data.settings : null;
     } catch {
@@ -176,9 +193,19 @@ const createApi = (baseUrl: string) => ({
   async saveSettings(settings: Settings): Promise<void> {
     await fetch(`${baseUrl}/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(settings)
     });
+  },
+
+  setApiKey(apiKey: string) {
+    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+  },
+
+  getApiKey,
+
+  clearApiKey() {
+    localStorage.removeItem(API_KEY_STORAGE_KEY);
   }
 });
 
@@ -263,6 +290,7 @@ export default function Home() {
       try {
         const response = await fetch(`${apiBaseUrl}/health`, { 
           method: 'GET',
+          headers: getAuthHeaders(),
           signal: AbortSignal.timeout(3000)
         });
         if (response.ok) {
@@ -436,7 +464,7 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBaseUrl}/smtp/test`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           smtp: {
             host: config.host,
@@ -538,7 +566,7 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBaseUrl}/email/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           smtp: {
             host: activeSmtp.host,

@@ -1,23 +1,27 @@
 import express from 'express';
 import cors from 'cors';
 import nodemailer from 'nodemailer';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { encrypt, decrypt, hashApiKey } from './crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'default-secret-change-in-production';
+const API_KEY_HASH = process.env.API_KEY_HASH ? hashApiKey(process.env.API_KEY_HASH) : null;
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['http://localhost:5173', 'http://localhost:3000'];
 
-// Data directory for local storage
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const LOGS_FILE = path.join(DATA_DIR, 'send-logs.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
-// Ensure data directory exists
 async function ensureDataDir() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -26,14 +30,42 @@ async function ensureDataDir() {
   }
 }
 
-// Initialize data directory
 ensureDataDir();
 
-// Middleware
-app.use(cors());
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 
-// Types
+const authenticate = (req: Request, res: Response, next: NextFunction) => {
+  if (!API_KEY_HASH) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  const apiKey = authHeader.slice(7);
+  if (hashApiKey(apiKey) !== API_KEY_HASH) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  next();
+};
+
+app.use('/api', authenticate);
+
 interface SmtpConfig {
   host: string;
   port: number;
@@ -88,6 +120,7 @@ interface Settings {
     useSSL: boolean;
     isActive: boolean;
     latency?: number;
+    isEncrypted?: boolean;
   }>;
   defaultSettings: {
     advanceMs: number;
@@ -96,7 +129,6 @@ interface Settings {
   };
 }
 
-// File storage helpers
 async function readLogs(): Promise<SendLog[]> {
   try {
     const data = await fs.readFile(LOGS_FILE, 'utf-8');
@@ -113,39 +145,69 @@ async function writeLogs(logs: SendLog[]): Promise<void> {
 async function readSettings(): Promise<Settings | null> {
   try {
     const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
-    return JSON.parse(data);
+    const settings = JSON.parse(data);
+    return decryptSettings(settings);
   } catch {
     return null;
   }
 }
 
 async function writeSettings(settings: Settings): Promise<void> {
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  const encryptedSettings = encryptSettings(settings);
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify(encryptedSettings, null, 2), 'utf-8');
 }
 
-// Create transporter with proper TLS settings
+function encryptSettings(settings: Settings): Settings {
+  return {
+    ...settings,
+    smtpConfigs: settings.smtpConfigs.map(config => {
+      if (config.isEncrypted) return config;
+      return {
+        ...config,
+        password: encrypt(config.password, ENCRYPTION_SECRET),
+        isEncrypted: true
+      };
+    })
+  };
+}
+
+function decryptSettings(settings: Settings): Settings {
+  return {
+    ...settings,
+    smtpConfigs: settings.smtpConfigs.map(config => {
+      if (!config.isEncrypted) return config;
+      try {
+        return {
+          ...config,
+          password: decrypt(config.password, ENCRYPTION_SECRET),
+          isEncrypted: false
+        };
+      } catch {
+        return { ...config, password: '', isEncrypted: false };
+      }
+    })
+  };
+}
+
 function createTransporter(smtp: SmtpConfig) {
-  // For port 587, use STARTTLS (secure: false, requireTLS: true)
-  // For port 465, use SSL/TLS (secure: true)
   const isStartTLS = smtp.port === 587;
   
   return nodemailer.createTransport({
     host: smtp.host,
     port: smtp.port,
-    secure: smtp.secure && !isStartTLS, // true for 465, false for other ports
-    requireTLS: isStartTLS, // Use STARTTLS for 587
+    secure: smtp.secure && !isStartTLS,
+    requireTLS: isStartTLS,
     auth: smtp.auth,
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 30000,
     tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
+      rejectUnauthorized: false,
       minVersion: 'TLSv1.2'
     }
   });
 }
 
-// Test SMTP connection and measure latency
 app.post('/api/smtp/test', async (req: Request, res: Response) => {
   const startTime = process.hrtime.bigint();
   
@@ -153,12 +215,10 @@ app.post('/api/smtp/test', async (req: Request, res: Response) => {
     const { smtp }: TestSmtpRequest = req.body;
     
     const transporter = createTransporter(smtp);
-
-    // Verify connection
     await transporter.verify();
     
     const endTime = process.hrtime.bigint();
-    const latencyMs = Number(endTime - startTime) / 1000000; // Convert to milliseconds
+    const latencyMs = Number(endTime - startTime) / 1000000;
     
     res.json({
       success: true,
@@ -177,26 +237,18 @@ app.post('/api/smtp/test', async (req: Request, res: Response) => {
   }
 });
 
-// Send email endpoint
 app.post('/api/email/send', async (req: Request, res: Response) => {
   const requestStartTime = Date.now();
   
   try {
     const { smtp, to, subject, body, attachments }: SendEmailRequest = req.body;
     
-    // Create transporter with proper settings
     const transporter = createTransporter(smtp);
-
-    // Prepare attachments
     const preparedAttachments = attachments?.map(att => ({
       filename: att.filename,
       content: Buffer.from(att.content, 'base64'),
     })) || [];
-
-    // Calculate attachment size
     const attachmentSize = attachments?.reduce((sum, att) => sum + att.content.length, 0) || 0;
-
-    // Send email with timing
     const sendStartTime = process.hrtime.bigint();
     
     const info = await transporter.sendMail({
@@ -209,10 +261,8 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
     
     const sendEndTime = process.hrtime.bigint();
     const serverResponseTime = Number(sendEndTime - sendStartTime) / 1000000;
-    
     const responseCode = info.response ? info.response.split(' ')[0] : '250';
     
-    // Save success log
     const now = Date.now();
     const log: SendLog = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -232,7 +282,6 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
     
     const logs = await readLogs();
     logs.unshift(log);
-    // Keep only last 1000 logs
     if (logs.length > 1000) {
       logs.length = 1000;
     }
@@ -249,7 +298,6 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Save error log
     const errorNow = Date.now();
     const log: SendLog = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -283,7 +331,6 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
   }
 });
 
-// Logs API
 app.get('/api/logs', async (_req: Request, res: Response) => {
   try {
     const logs = await readLogs();
@@ -301,7 +348,6 @@ app.post('/api/logs', async (req: Request, res: Response) => {
     const log: SendLog = req.body;
     const logs = await readLogs();
     logs.unshift(log);
-    // Keep only last 1000 logs
     if (logs.length > 1000) {
       logs.length = 1000;
     }
@@ -342,7 +388,6 @@ app.delete('/api/logs', async (_req: Request, res: Response) => {
   }
 });
 
-// Settings API
 app.get('/api/settings', async (_req: Request, res: Response) => {
   try {
     const settings = await readSettings();
@@ -368,13 +413,12 @@ app.post('/api/settings', async (req: Request, res: Response) => {
   }
 });
 
-// Health check
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  res.json({ status: 'ok', timestamp: Date.now(), secure: !!API_KEY_HASH });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Email server running on port ${PORT}`);
   console.log(`Data directory: ${DATA_DIR}`);
+  console.log(`Security: ${API_KEY_HASH ? 'API Key enabled' : 'API Key disabled (not recommended for production)'}`);
 });
