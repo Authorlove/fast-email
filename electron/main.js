@@ -37,7 +37,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   try {
-    const { startServer } = require('../api/server-electron.cjs');
+    const { startServer } = require('./server-electron.cjs');
     serverPort = await startServer();
     console.log(`Server started on port ${serverPort}`);
   } catch (error) {

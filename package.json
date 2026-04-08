@@ -30,7 +30,6 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "api/server-electron.cjs",
       "package.json",
       "node_modules/**/*"
     ],

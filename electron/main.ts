@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const { startServer } = require('../api/server-electron.cjs');
+const { startServer } = require('./server-electron.cjs');
 
 let mainWindow: BrowserWindow | null = null;
 let serverPort = 3001;
