@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": "mnq6i06nxm1ha65mm9",
+    "timestamp": 1775660642159,
+    "scheduledTime": 1775660642159,
+    "actualSendTime": 1775660642159,
+    "serverResponseTime": 941,
+    "receivedTime": 1775660642159,
+    "status": "success",
+    "responseCode": "250",
+    "smtpServer": "smtp.qq.com",
+    "attachmentSize": 34764,
+    "from": "arthur.xqw@qq.com",
+    "to": "arthur.xqw@qq.com",
+    "subject": "test"
+  },
+  {
+    "id": "mnq6fit67a6pwa69aya",
+    "timestamp": 1775660526330,
+    "scheduledTime": 1775660526330,
+    "actualSendTime": 1775660526330,
+    "serverResponseTime": 1072,
+    "receivedTime": 1775660526330,
+    "status": "success",
+    "responseCode": "250",
+    "smtpServer": "smtp.qq.com",
+    "attachmentSize": 34764,
+    "from": "arthur.xqw@qq.com",
+    "to": "arthur.xqw@qq.com",
+    "subject": "test"
+  }
+]

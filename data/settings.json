@@ -1,5 +1,18 @@
 {
-  "smtpConfigs": [],
+  "smtpConfigs": [
+    {
+      "host": "smtp.qq.com",
+      "port": 465,
+      "username": "arthur.xqw@qq.com",
+      "password": "ea219Q9roSP7oBkXr+lF06EmH+hV1SOZte1mqmhS/TAkukGegGnBbDombzE13voguSrumpaUP+1UDhIZFXZJ6YTnCZnDAP+jYvM+MLBZaqXENjvuMbJAMt8vb2MtQZ25Hp5qARU2O3dKLjnaUYPuuA==",
+      "useSSL": true,
+      "isActive": true,
+      "name": "arthur.xqw@qq.com",
+      "id": "ded9cfa0-cca4-4e99-b2f5-49833c0f5953",
+      "isEncrypted": true,
+      "latency": 509
+    }
+  ],
   "defaultSettings": {
     "advanceMs": 100,
     "maxAttachmentSize": 10,

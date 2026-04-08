@@ -34,7 +34,7 @@ ensureDataDir();
 
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -158,10 +158,11 @@ async function writeSettings(settings: Settings): Promise<void> {
 }
 
 function encryptSettings(settings: Settings): Settings {
+  if (!settings || !settings.smtpConfigs) return settings;
   return {
     ...settings,
     smtpConfigs: settings.smtpConfigs.map(config => {
-      if (config.isEncrypted) return config;
+      if (config.isEncrypted || !config.password) return config;
       return {
         ...config,
         password: encrypt(config.password, ENCRYPTION_SECRET),
@@ -172,10 +173,11 @@ function encryptSettings(settings: Settings): Settings {
 }
 
 function decryptSettings(settings: Settings): Settings {
+  if (!settings || !settings.smtpConfigs) return settings;
   return {
     ...settings,
     smtpConfigs: settings.smtpConfigs.map(config => {
-      if (!config.isEncrypted) return config;
+      if (!config.isEncrypted || !config.password) return config;
       try {
         return {
           ...config,
@@ -406,6 +408,7 @@ app.post('/api/settings', async (req: Request, res: Response) => {
     await writeSettings(settings);
     res.json({ success: true });
   } catch (error) {
+    console.error('Failed to save settings:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save settings'

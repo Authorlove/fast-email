@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Mail, 
   Clock, 
@@ -24,9 +24,11 @@ import RichTextEditor from '../components/RichTextEditor';
 import SmtpResponseCode from '../components/SmtpResponseCode';
 
 const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_URL || (
-  typeof window !== 'undefined' && window.location.protocol.startsWith('http') && window.location.port !== '5173'
-    ? `${window.location.origin}/api`
-    : 'http://localhost:3001/api'
+  import.meta.env.DEV 
+    ? 'http://localhost:3001/api' 
+    : (typeof window !== 'undefined' && window.location.protocol.startsWith('http') 
+        ? `${window.location.origin}/api` 
+        : 'http://localhost:3001/api')
 );
 const API_KEY_STORAGE_KEY = 'fastemail_api_key';
 
@@ -195,11 +197,15 @@ const createApi = (baseUrl: string) => ({
   },
   
   async saveSettings(settings: Settings): Promise<void> {
-    await fetch(`${baseUrl}/settings`, {
+    const response = await fetch(`${baseUrl}/settings`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(settings)
     });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP Error ${response.status}`);
+    }
   },
 
   setApiKey(apiKey: string) {
@@ -263,7 +269,7 @@ export default function Home() {
   const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const api = createApi(apiBaseUrl);
+  const api = useMemo(() => createApi(apiBaseUrl), [apiBaseUrl]);
 
   // Initialize API base URL from Electron
   useEffect(() => {
@@ -319,10 +325,10 @@ export default function Home() {
           // Load settings
           const settings = await api.getSettings();
           if (settings) {
-            setSmtpConfigs(settings.smtpConfigs);
+            setSmtpConfigs(settings.smtpConfigs || []);
             setSchedule(prev => ({
               ...prev,
-              advanceMs: settings.defaultSettings.advanceMs
+              advanceMs: settings.defaultSettings?.advanceMs || 100
             }));
           } else {
             // Save default settings if none exist
@@ -360,6 +366,9 @@ export default function Home() {
             maxAttachmentSize: 10,
             autoSaveDraft: false
           }
+        }).catch(e => {
+          console.error('Auto-save failed:', e);
+          toast.error(`配置保存失败: ${e.message}`);
         });
       }, 1000);
       return () => clearTimeout(timeout);
@@ -712,11 +721,17 @@ export default function Home() {
   };
 
   // Add SMTP config
-  const addSmtpConfig = (config: Omit<SmtpConfig, 'id'>) => {
+  const addSmtpConfig = async (config: Omit<SmtpConfig, 'id'>) => {
     const newConfig: SmtpConfig = {
       ...config,
       id: generateUUID()
     };
+    
+    // 如果这是第一个添加的服务器，默认设为激活状态
+    if (smtpConfigs.length === 0) {
+      newConfig.isActive = true;
+    }
+    
     setSmtpConfigs(prev => [...prev, newConfig]);
     setShowAddSmtp(false);
     toast.success('SMTP服务器已添加');
@@ -1419,7 +1434,6 @@ export default function Home() {
 // Add SMTP Modal Component
 function AddSmtpModal({ onClose, onAdd }: { onClose: () => void; onAdd: (config: Omit<SmtpConfig, 'id'>) => void }) {
   const [form, setForm] = useState({
-    name: '',
     host: '',
     port: 587,
     username: '',
@@ -1428,9 +1442,46 @@ function AddSmtpModal({ onClose, onAdd }: { onClose: () => void; onAdd: (config:
     isActive: true
   });
 
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForm(prev => {
+      const newForm = { ...prev, username: value };
+      if (value.includes('@')) {
+        const domain = value.split('@')[1].toLowerCase();
+        const SMTP_PROVIDERS: Record<string, { host: string, port: number, useSSL: boolean }> = {
+          'qq.com': { host: 'smtp.qq.com', port: 465, useSSL: true },
+          'foxmail.com': { host: 'smtp.qq.com', port: 465, useSSL: true },
+          '163.com': { host: 'smtp.163.com', port: 465, useSSL: true },
+          '126.com': { host: 'smtp.126.com', port: 465, useSSL: true },
+          'yeah.net': { host: 'smtp.yeah.net', port: 465, useSSL: true },
+          'aliyun.com': { host: 'smtp.aliyun.com', port: 465, useSSL: true },
+          'gmail.com': { host: 'smtp.gmail.com', port: 465, useSSL: true },
+          'outlook.com': { host: 'smtp-mail.outlook.com', port: 587, useSSL: false },
+          'hotmail.com': { host: 'smtp-mail.outlook.com', port: 587, useSSL: false }
+        };
+
+        if (SMTP_PROVIDERS[domain]) {
+          const provider = SMTP_PROVIDERS[domain];
+          const isKnownHost = !prev.host || Object.values(SMTP_PROVIDERS).some(p => p.host === prev.host);
+          
+          if (isKnownHost) {
+            newForm.host = provider.host;
+            newForm.port = provider.port;
+            newForm.useSSL = provider.useSSL;
+          }
+        }
+      }
+      return newForm;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd(form);
+    onAdd({
+      ...form,
+      name: form.username || form.host, // Use username as the fallback name since we removed the name field
+      isActive: true // 默认设为 true，外层会进一步处理
+    });
   };
 
   return (
@@ -1445,17 +1496,28 @@ function AddSmtpModal({ onClose, onAdd }: { onClose: () => void; onAdd: (config:
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">服务器名称</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">用户名</label>
             <input
               type="text"
               required
-              value={form.name}
-              onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="例如：企业邮箱"
+              value={form.username}
+              onChange={handleUsernameChange}
+              placeholder="your@email.com"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
           
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">密码/授权码</label>
+            <input
+              type="password"
+              required
+              value={form.password}
+              onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">服务器地址</label>
             <input
@@ -1475,27 +1537,6 @@ function AddSmtpModal({ onClose, onAdd }: { onClose: () => void; onAdd: (config:
               required
               value={form.port}
               onChange={e => setForm(prev => ({ ...prev, port: parseInt(e.target.value) }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">用户名</label>
-            <input
-              type="text"
-              value={form.username}
-              onChange={e => setForm(prev => ({ ...prev, username: e.target.value }))}
-              placeholder="your@email.com"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">密码/授权码</label>
-            <input
-              type="password"
-              value={form.password}
-              onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
