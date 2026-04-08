@@ -2,6 +2,14 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "env": {
+    "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+  },
+  "build": {
+    "env": {
+      "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",
