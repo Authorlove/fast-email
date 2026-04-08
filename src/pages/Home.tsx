@@ -23,8 +23,7 @@ import { toast } from 'sonner';
 import RichTextEditor from '../components/RichTextEditor';
 import SmtpResponseCode from '../components/SmtpResponseCode';
 
-// API Base URL
-const API_BASE_URL = 'http://localhost:3001/api';
+const DEFAULT_API_BASE_URL = 'http://localhost:3001/api';
 
 // Types
 interface SmtpConfig {
@@ -134,12 +133,12 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// API functions for local file storage
-const api = {
+// Helper to create API functions with dynamic base URL
+const createApi = (baseUrl: string) => ({
   // Logs
   async getLogs(): Promise<SendLog[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/logs`);
+      const response = await fetch(`${baseUrl}/logs`);
       const data = await response.json();
       return data.success ? data.logs : [];
     } catch {
@@ -148,7 +147,7 @@ const api = {
   },
   
   async saveLog(log: SendLog): Promise<void> {
-    await fetch(`${API_BASE_URL}/logs`, {
+    await fetch(`${baseUrl}/logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(log)
@@ -156,17 +155,17 @@ const api = {
   },
   
   async deleteLog(id: string): Promise<void> {
-    await fetch(`${API_BASE_URL}/logs/${id}`, { method: 'DELETE' });
+    await fetch(`${baseUrl}/logs/${id}`, { method: 'DELETE' });
   },
   
   async clearLogs(): Promise<void> {
-    await fetch(`${API_BASE_URL}/logs`, { method: 'DELETE' });
+    await fetch(`${baseUrl}/logs`, { method: 'DELETE' });
   },
   
   // Settings
   async getSettings(): Promise<Settings | null> {
     try {
-      const response = await fetch(`${API_BASE_URL}/settings`);
+      const response = await fetch(`${baseUrl}/settings`);
       const data = await response.json();
       return data.success ? data.settings : null;
     } catch {
@@ -175,13 +174,13 @@ const api = {
   },
   
   async saveSettings(settings: Settings): Promise<void> {
-    await fetch(`${API_BASE_URL}/settings`, {
+    await fetch(`${baseUrl}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
     });
   }
-};
+});
 
 const formatTime = (timestamp: number): string => {
   const date = new Date(timestamp);
@@ -195,6 +194,7 @@ const formatTime = (timestamp: number): string => {
 // Main Component
 export default function Home() {
   // State
+  const [apiBaseUrl, setApiBaseUrl] = useState<string>(DEFAULT_API_BASE_URL);
   const [smtpConfigs, setSmtpConfigs] = useState<SmtpConfig[]>([]);
   
   const [emailContent, setEmailContent] = useState<EmailContent>({
@@ -231,7 +231,23 @@ export default function Home() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const api = createApi(apiBaseUrl);
+
+  // Initialize API base URL from Electron
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      (async () => {
+        try {
+          const port = await window.electronAPI.getServerPort();
+          setApiBaseUrl(`http://localhost:${port}/api`);
+        } catch (error) {
+          console.error('Failed to get server port:', error);
+        }
+      })();
+    }
+  }, []);
 
   // Update current time every 10ms for millisecond precision display
   useEffect(() => {
@@ -245,7 +261,7 @@ export default function Home() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/health`, { 
+        const response = await fetch(`${apiBaseUrl}/health`, { 
           method: 'GET',
           signal: AbortSignal.timeout(3000)
         });
@@ -262,7 +278,7 @@ export default function Home() {
     checkHealth();
     const interval = setInterval(checkHealth, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [apiBaseUrl]);
 
   // Load settings and logs from local files when server is online
   useEffect(() => {
@@ -299,7 +315,7 @@ export default function Home() {
       
       loadData();
     }
-  }, [serverStatus]);
+  }, [serverStatus, api]);
 
   // Auto-save settings when smtpConfigs change
   useEffect(() => {
@@ -316,7 +332,7 @@ export default function Home() {
       }, 1000);
       return () => clearTimeout(timeout);
     }
-  }, [smtpConfigs, schedule.advanceMs, serverStatus]);
+  }, [smtpConfigs, schedule.advanceMs, serverStatus, api]);
 
   // NTP sync simulation
   const syncNtp = useCallback(async () => {
@@ -418,7 +434,7 @@ export default function Home() {
 
     const start = performance.now();
     try {
-      const response = await fetch(`${API_BASE_URL}/smtp/test`, {
+      const response = await fetch(`${apiBaseUrl}/smtp/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -520,7 +536,7 @@ export default function Home() {
     setLogs(prev => [newLog, ...prev]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/email/send`, {
+      const response = await fetch(`${apiBaseUrl}/email/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1343,7 +1359,7 @@ export default function Home() {
                 </div>
                 <div className="flex justify-between py-2 border-b border-slate-100">
                   <span className="text-slate-500">后端API</span>
-                  <span className="font-mono text-slate-700">{API_BASE_URL}</span>
+                  <span className="font-mono text-slate-700">{apiBaseUrl}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-slate-100">
                   <span className="text-slate-500">服务器状态</span>
