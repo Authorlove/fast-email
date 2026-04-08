@@ -1,7 +1,7 @@
 {
   "name": "fast-email",
   "version": "1.0.0",
-  "description": "Fast Email Desktop Application",
+  "description": "投标邮件极速发送系统",
   "main": "electron/main.js",
   "author": "",
   "license": "MIT",
@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.fastemail.app",
-    "productName": "Fast Email",
+    "productName": "投标邮件极速发送系统",
     "directories": {
       "output": "release"
     },

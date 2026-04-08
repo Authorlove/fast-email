@@ -21,7 +21,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.setTitle('Fast Email');
+  mainWindow.setTitle('投标邮件极速发送系统');
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL(`http://localhost:5173`);

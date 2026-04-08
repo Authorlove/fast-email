@@ -758,7 +758,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-lg">
-                <Mail className="w-6 h-6 text-white" />
+                <Send className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900">投标邮件极速发送系统</h1>
