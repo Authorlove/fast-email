@@ -26,7 +26,7 @@ function createWindow() {
 
   mainWindow.setTitle('投标邮件极速发送系统');
 
-  if (process.env.NODE_ENV === 'development') {
+  if (!app.isPackaged) {
     mainWindow.loadURL(`http://localhost:5173`);
     mainWindow.webContents.openDevTools();
   } else {

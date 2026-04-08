@@ -30,12 +30,11 @@
     "directories": {
       "output": "release"
     },
-    "asar": false,
+    "asar": true,
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json",
-      "node_modules/**/*"
+      "package.json"
     ],
     "win": {
       "target": [
@@ -93,6 +92,7 @@
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",
     "vite-plugin-trae-solo-badge": "^1.0.0",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "wait-on": "^9.0.4"
   }
 }
