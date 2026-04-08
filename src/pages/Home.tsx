@@ -23,7 +23,11 @@ import { toast } from 'sonner';
 import RichTextEditor from '../components/RichTextEditor';
 import SmtpResponseCode from '../components/SmtpResponseCode';
 
-const DEFAULT_API_BASE_URL = 'http://localhost:3001/api';
+const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_URL || (
+  typeof window !== 'undefined' && window.location.protocol.startsWith('http') && window.location.port !== '5173'
+    ? `${window.location.origin}/api`
+    : 'http://localhost:3001/api'
+);
 const API_KEY_STORAGE_KEY = 'fastemail_api_key';
 
 // Types
@@ -256,7 +260,6 @@ export default function Home() {
     smtpEncrypt: true
   });
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -343,6 +346,7 @@ export default function Home() {
       
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverStatus, api]);
 
   // Auto-save settings when smtpConfigs change

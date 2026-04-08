@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  fast-email:
+    build: .
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      # Optional: Set a secret for encrypting SMTP passwords
+      # - ENCRYPTION_SECRET=your-secret-key-here
+      # Optional: Require API Key for API access
+      # - API_KEY_HASH=your-api-key-hash-here
+      # Optional: Restrict allowed origins for CORS
+      # - ALLOWED_ORIGINS=http://localhost:3001,http://yourdomain.com
+    restart: unless-stopped

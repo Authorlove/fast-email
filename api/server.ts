@@ -417,6 +417,19 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: Date.now(), secure: !!API_KEY_HASH });
 });
 
+// Serve frontend static files in production
+const DIST_DIR = path.join(__dirname, '..', 'dist');
+app.use(express.static(DIST_DIR));
+
+// Catch-all route to serve index.html for SPA routing
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  } else {
+    next();
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Email server running on port ${PORT}`);
   console.log(`Data directory: ${DATA_DIR}`);

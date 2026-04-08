@@ -1,5 +1,7 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
+import { app, BrowserWindow, ipcMain } from 'electron';
+import * as path from 'path';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 const { startServer } = require('./server-electron.cjs');
 
 let mainWindow: BrowserWindow | null = null;

@@ -30,6 +30,7 @@ const SMTP_CODES: Record<string, string> = {
   'ERROR': '发送失败或网络错误',
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getSmtpCodeDescription(code: string): string {
   return SMTP_CODES[code] || '未知响应码';
 }

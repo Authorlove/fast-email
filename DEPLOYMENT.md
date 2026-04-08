@@ -69,6 +69,31 @@
 
 部署完成后，需要更新前端代码中的 API 地址，将 `localhost:3001` 替换为 Render 提供的 URL。
 
+## 本地 / 私有服务器部署 (推荐)
+
+如果你希望将 Fast Email 部署在自己的服务器或本地环境，可以通过 Docker 轻松完成。本地部署的优势是前端和后端可以运行在同一个服务下。
+
+### 使用 Docker Compose 部署
+
+1. **确保服务器已安装 Docker 和 Docker Compose**
+2. **克隆代码并启动服务**
+   ```bash
+   git clone https://github.com/your-username/fast-email.git
+   cd fast-email
+   docker-compose up -d
+   ```
+3. **访问应用**
+   打开浏览器访问 `http://localhost:3001` (或你的服务器 IP 地址 `http://<server-ip>:3001`)。
+
+### 环境变量配置 (可选)
+
+编辑 `docker-compose.yml` 可以配置环境变量：
+- `ENCRYPTION_SECRET`: 用于加密本地存储的 SMTP 密码（推荐修改）。
+- `API_KEY_HASH`: 启用后，需在客户端设置对应的 API Key 方可使用服务。
+- `ALLOWED_ORIGINS`: 限制允许的跨域来源。
+
+---
+
 ## 使用 GitHub Actions 自动部署
 
 配置完成后，每次推送到 `main` 分支都会自动触发部署：
