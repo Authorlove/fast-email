@@ -65,23 +65,39 @@ async function writeSettings(settings) {
   await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
+const transporterCache = new Map();
+
 function createTransporter(smtp) {
   const isStartTLS = smtp.port === 587;
+  const cacheKey = `${smtp.host}:${smtp.port}:${smtp.auth.user}`;
   
-  return nodemailer.createTransport({
-    host: smtp.host,
-    port: smtp.port,
-    secure: smtp.secure && !isStartTLS,
-    requireTLS: isStartTLS,
-    auth: smtp.auth,
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-    tls: {
-      rejectUnauthorized: false,
-      minVersion: 'TLSv1.2'
-    }
-  });
+  if (!transporterCache.has(cacheKey)) {
+    const transporter = nodemailer_1.default.createTransport({
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 1000,
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure && !isStartTLS,
+      requireTLS: isStartTLS,
+      auth: smtp.auth,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      }
+    });
+    
+    transporter.verify().catch(err => {
+      console.error('Failed to warm up SMTP connection:', err);
+    });
+    
+    transporterCache.set(cacheKey, transporter);
+  }
+  
+  return transporterCache.get(cacheKey);
 }
 
 app.post('/api/smtp/test', async (req, res) => {
