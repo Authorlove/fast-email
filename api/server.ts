@@ -81,6 +81,7 @@ interface SendEmailRequest {
   to: string;
   subject: string;
   body: string;
+  scheduledTime?: number;
   attachments?: Array<{
     filename: string;
     content: string;
@@ -97,6 +98,7 @@ interface SendLog {
   timestamp: number;
   scheduledTime: number;
   actualSendTime: number;
+  duration: number;
   serverResponseTime: number;
   receivedTime: number;
   status: 'success' | 'failed' | 'pending';
@@ -260,7 +262,7 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
   const requestStartTime = Date.now();
   
   try {
-    const { smtp, to, subject, body, attachments }: SendEmailRequest = req.body;
+    const { smtp, to, subject, body, scheduledTime, attachments }: SendEmailRequest = req.body;
     
     const transporter = createTransporter(smtp);
     const preparedAttachments = attachments?.map(att => ({
@@ -286,8 +288,9 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
     const log: SendLog = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
       timestamp: now,
-      scheduledTime: now,
-      actualSendTime: now,
+      scheduledTime: scheduledTime || requestStartTime,
+      actualSendTime: requestStartTime,
+      duration: now - requestStartTime,
       serverResponseTime: Math.round(serverResponseTime),
       receivedTime: now,
       status: 'success',
@@ -311,8 +314,10 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
       messageId: info.messageId,
       responseCode,
       serverResponseTime: Math.round(serverResponseTime),
+      duration: now - requestStartTime,
       totalTime: Date.now() - requestStartTime,
-      timestamp: Date.now(),
+      timestamp: requestStartTime,
+      receivedTime: now,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -321,10 +326,11 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
     const log: SendLog = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
       timestamp: errorNow,
-      scheduledTime: errorNow,
-      actualSendTime: errorNow,
+      scheduledTime: req.body.scheduledTime || requestStartTime,
+      actualSendTime: requestStartTime,
+      duration: errorNow - requestStartTime,
       serverResponseTime: 0,
-      receivedTime: 0,
+      receivedTime: errorNow,
       status: 'failed',
       responseCode: 'ERROR',
       smtpServer: req.body.smtp?.host || 'unknown',
@@ -345,7 +351,9 @@ app.post('/api/email/send', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: errorMessage,
-      timestamp: Date.now(),
+      timestamp: requestStartTime,
+      duration: errorNow - requestStartTime,
+      receivedTime: errorNow,
     });
   }
 });

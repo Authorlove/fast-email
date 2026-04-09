@@ -71,6 +71,7 @@ interface SendLog {
   timestamp: number;
   scheduledTime: number;
   actualSendTime: number;
+  duration: number;
   serverResponseTime: number;
   receivedTime: number;
   status: 'success' | 'failed' | 'pending';
@@ -563,6 +564,7 @@ export default function Home() {
       timestamp: Date.now(),
       scheduledTime,
       actualSendTime: 0,
+      duration: 0,
       serverResponseTime: 0,
       receivedTime: 0,
       status: 'pending',
@@ -593,6 +595,7 @@ export default function Home() {
           to: emailContent.to,
           subject: emailContent.subject,
           body: emailContent.body,
+          scheduledTime,
           attachments: emailContent.attachments.map(att => ({
             filename: att.name,
             content: att.content,
@@ -604,14 +607,14 @@ export default function Home() {
       const data = await response.json();
       
       if (data.success) {
-        const now = Date.now();
         setLogs(prev => prev.map(log => 
           log.id === logId 
             ? {
                 ...log,
                 actualSendTime: data.timestamp,
+                duration: data.duration,
                 serverResponseTime: data.serverResponseTime,
-                receivedTime: now,
+                receivedTime: data.receivedTime,
                 status: 'success',
                 responseCode: data.responseCode
               }
@@ -619,7 +622,7 @@ export default function Home() {
         ));
         
         toast.success('邮件发送成功', {
-          description: `服务器响应: ${data.responseCode}, 耗时: ${data.serverResponseTime}ms`
+          description: `服务器响应: ${data.responseCode}, 耗时: ${data.duration}ms`
         });
       } else {
         throw new Error(data.error || '发送失败');
@@ -630,6 +633,8 @@ export default function Home() {
           ? {
               ...log,
               actualSendTime: Date.now(),
+              duration: Date.now() - newLog.timestamp,
+              receivedTime: Date.now(),
               status: 'failed',
               error: error instanceof Error ? error.message : '未知错误'
             }
@@ -684,13 +689,14 @@ export default function Home() {
 
   // Export logs to CSV
   const exportLogs = () => {
-    const headers = ['时间戳', '预设时间', '实际发送时间', '服务器响应时间', '成功收到时间', '状态', '响应码', '发件人', '收件人', '主题', 'SMTP服务器', '附件大小', '错误信息'];
+    const headers = ['时间戳', '定时时间', '开始发送时间', '耗时(ms)', '收到响应的时间', '服务器响应时间', '状态', '响应码', '发件人', '收件人', '主题', 'SMTP服务器', '附件大小', '错误信息'];
     const rows = logs.map(log => [
       new Date(log.timestamp).toISOString(),
       new Date(log.scheduledTime).toISOString(),
       log.actualSendTime ? new Date(log.actualSendTime).toISOString() : '-',
-      log.serverResponseTime + 'ms',
+      log.duration || '-',
       log.receivedTime ? new Date(log.receivedTime).toISOString() : '-',
+      log.serverResponseTime + 'ms',
       log.status,
       log.responseCode,
       log.from || '-',
@@ -1235,6 +1241,10 @@ export default function Home() {
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">时间</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">定时时间</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">开始发送时间</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">耗时</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">收到响应的时间</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">状态</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">发件人</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">收件人</th>
@@ -1249,6 +1259,18 @@ export default function Home() {
                         <tr key={log.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 text-sm text-slate-700">
                             {formatTime(log.timestamp)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
+                            {log.scheduledTime ? formatTime(log.scheduledTime) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
+                            {log.actualSendTime ? formatTime(log.actualSendTime) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
+                            {log.duration !== undefined ? `${log.duration}ms` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
+                            {log.receivedTime ? formatTime(log.receivedTime) : '-'}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
