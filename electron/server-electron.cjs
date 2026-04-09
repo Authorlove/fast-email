@@ -72,7 +72,7 @@ function createTransporter(smtp) {
   const cacheKey = `${smtp.host}:${smtp.port}:${smtp.auth.user}`;
   
   if (!transporterCache.has(cacheKey)) {
-    const transporter = nodemailer_1.default.createTransport({
+    const transporter = nodemailer.createTransport({
       pool: true,
       maxConnections: 5,
       maxMessages: 1000,
@@ -133,7 +133,7 @@ app.post('/api/email/send', async (req, res) => {
   const requestStartTime = Date.now();
   
   try {
-    const { smtp, to, subject, body, attachments } = req.body;
+    const { smtp, to, subject, body, attachments, scheduledTime } = req.body;
     
     const transporter = createTransporter(smtp);
     const preparedAttachments = attachments?.map(att => ({
@@ -159,8 +159,9 @@ app.post('/api/email/send', async (req, res) => {
     const log = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
       timestamp: now,
-      scheduledTime: now,
-      actualSendTime: now,
+      scheduledTime: scheduledTime || requestStartTime,
+      actualSendTime: requestStartTime,
+      duration: now - requestStartTime,
       serverResponseTime: Math.round(serverResponseTime),
       receivedTime: now,
       status: 'success',
@@ -184,8 +185,10 @@ app.post('/api/email/send', async (req, res) => {
       messageId: info.messageId,
       responseCode,
       serverResponseTime: Math.round(serverResponseTime),
+      duration: now - requestStartTime,
       totalTime: Date.now() - requestStartTime,
-      timestamp: Date.now(),
+      timestamp: requestStartTime,
+      receivedTime: now,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -194,10 +197,11 @@ app.post('/api/email/send', async (req, res) => {
     const log = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2),
       timestamp: errorNow,
-      scheduledTime: errorNow,
-      actualSendTime: errorNow,
+      scheduledTime: req.body.scheduledTime || requestStartTime,
+      actualSendTime: requestStartTime,
+      duration: errorNow - requestStartTime,
       serverResponseTime: 0,
-      receivedTime: 0,
+      receivedTime: errorNow,
       status: 'failed',
       responseCode: 'ERROR',
       smtpServer: req.body.smtp?.host || 'unknown',
@@ -218,7 +222,9 @@ app.post('/api/email/send', async (req, res) => {
     res.status(500).json({
       success: false,
       error: errorMessage,
-      timestamp: Date.now(),
+      timestamp: requestStartTime,
+      duration: errorNow - requestStartTime,
+      receivedTime: errorNow,
     });
   }
 });
