@@ -21,7 +21,8 @@
     "electron:build": "npm run build",
     "electron:preview": "npm run build && electron .",
     "electron:pack": "npm run build && electron-builder --dir",
-    "electron:dist": "npm run build && electron-builder",
+    "electron:dist": "npm run build && electron-builder --publish=never",
+    "electron:dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish=never",
     "electron:dist:win": "npm run build && electron-builder --win --x64 --publish=never"
   },
   "build": {
@@ -36,7 +37,15 @@
       "electron/**/*",
       "package.json"
     ],
+    "mac": {
+      "icon": "public/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
     "win": {
+      "icon": "public/icon.png",
       "target": [
         "nsis",
         "portable"
